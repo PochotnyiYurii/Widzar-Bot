@@ -14,6 +14,7 @@ from datetime import datetime
 from config_reader import config
 
 from utils.keyboards import *
+from utils.db import *
 
 logging.basicConfig(level=logging.INFO)
 
@@ -63,6 +64,8 @@ async def contact(message: types.Message, state: FSMContext):
 
     if not starts_with_plus:
         phone_number = '+' + phone_number
+
+    add_user(user_id, first_name, username, phone_number)
 
     msg = "Дякуємо за реєстрацію!" 
     await message.answer(msg, reply_markup=types.ReplyKeyboardRemove())
