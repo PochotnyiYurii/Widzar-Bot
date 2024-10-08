@@ -31,3 +31,11 @@ def is_user_active(user_id):
 def get_name(user_id):
     query = "SELECT name FROM info WHERE user_id = ?"
     return execute_query(query, user_id)
+
+def get_first_name(user_id):
+    query = "SELECT first_name FROM info WHERE user_id = ?"
+    return execute_query(query, user_id)
+
+def save_name(name, user_id):
+    query = "UPDATE info SET name = ? WHERE user_id = ?"
+    return execute_query(query, name, user_id)
