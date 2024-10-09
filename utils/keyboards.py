@@ -25,7 +25,7 @@ def get_button_admin():
     buttons = [
         [
             types.InlineKeyboardButton(text="Прийняти ✅", callback_data="Accept"),
-            types.InlineKeyboardButton(text="Відмовити ❌", callback_data="Cancel"),
+            types.InlineKeyboardButton(text="Відмовити ❌", callback_data="Decline"),
         ],
         [
             types.InlineKeyboardButton(text="БАН 🚫", callback_data="Ban")

@@ -27,8 +27,10 @@ bot = Bot(token=config.bot_token.get_secret_value(),
             )
         )
 
+
 class Contact(StatesGroup):
     wait_for_contact = State()
+
 
 @dp.message(F.text, Command('start'))
 async def start(message: types.Message, state: FSMContext):
@@ -53,6 +55,7 @@ async def start(message: types.Message, state: FSMContext):
     await message.answer(msg, reply_markup=contact_btn())
     await state.set_state(Contact.wait_for_contact)
 
+
 @dp.message(Contact.wait_for_contact)
 async def contact(message: types.Message, state: FSMContext): 
     
@@ -75,6 +78,7 @@ async def contact(message: types.Message, state: FSMContext):
     msg = f"Дякуємо за реєстрацію <b>{first_name}</b>!" 
     await message.answer(msg, reply_markup=types.ReplyKeyboardRemove())
     await state.clear()
+
 
 @dp.message(F.text, Command("order"))
 async def order(message: types.Message):
@@ -112,6 +116,7 @@ async def order(message: types.Message):
         await message.answer(msg)
         return
 
+
 @dp.message(F.text, Command("stop"))
 async def stop(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
@@ -133,6 +138,7 @@ class Waits(StatesGroup):
     wait_for_order = State()
     wait_for_reason = State()
 
+
 @dp.callback_query(F.data == "YesBtn")
 async def YesBtn(call: types.CallbackQuery, state: FSMContext):
     global user_id
@@ -150,6 +156,7 @@ async def YesBtn(call: types.CallbackQuery, state: FSMContext):
             msg = "Чудово! Напишіть, будь ласка, ваше ім'я! 👤"
             await call.message.answer(msg)
             await state.set_state(Waits.wait_for_name)
+
 
 @dp.message(Waits.wait_for_name)
 async def name(message: types.Message, state: FSMContext): 
@@ -183,6 +190,7 @@ async def send_order(message: types.Message, state: FSMContext):
         await bot.send_message(admin_id, to_admin, reply_markup=get_button_admin())
         await state.clear()
 
+
 @dp.callback_query(F.data == 'NoBtn')
 async def NoBtn(call: types.CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
@@ -200,6 +208,42 @@ async def NoBtn(call: types.CallbackQuery, state: FSMContext):
 
     msg = "Добре! Буду на вас чекати, якщо захочете здійснити замовлення! ✅"
     await call.message.answer(msg)
+
+
+# ===================================================================================================
+# ================================ Accept & decline btn handlers ====================================
+# ===================================================================================================
+
+
+@dp.callback_query(F.data == "Accept")
+async def accept(call: types.CallbackQuery):
+    set_user_inactive(user_id)
+    approved = "\n\n ✅✅✅ Прийнято ✅✅✅"
+    await call.message.edit_text(text=to_admin+approved, reply_markup=None)
+    msg = "✅ Ваше замовлення було прийнято. Я завжди тут, якщо ви забажаєте здійснити нове замовлення! ✅"
+    await call.bot.send_message(user_id, msg)
+
+
+@dp.callback_query(F.data == "Decline")
+async def accept(call: types.CallbackQuery, state: FSMContext):
+    set_user_inactive(user_id)
+    msg = "Вкажіть причину:"
+    declined = "\n\n ❌❌❌ Відмовлено ❌❌❌"
+    await call.message.edit_text(text=to_admin+declined, reply_markup=None)
+    await bot.send_message(admin_id, msg)
+    await state.set_state(Waits.wait_for_reason)
+
+
+@dp.message(Waits.wait_for_reason)
+async def order(message: types.Message, state: FSMContext): 
+    reason = message.text
+    if reason.lower() == "без":
+        msg = "❌❌❌ На жаль, вам було відмовлено. Гарного дня! ❌❌❌"
+    else:
+        msg = f"❌❌❌ На жаль, вам було відмовлено за насутпною причиною: <b>{reason}.</b> Гарного дня! ❌❌❌"
+    await bot.send_message(user_id, msg, reply_markup=None)
+    await state.clear()
+
 
 async def main():
     await dp.start_polling(bot)
