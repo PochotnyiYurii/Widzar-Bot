@@ -21,6 +21,7 @@ def get_button():
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard
 
+
 def get_button_admin():
     buttons = [
         [
@@ -29,6 +30,16 @@ def get_button_admin():
         ],
         [
             types.InlineKeyboardButton(text="БАН 🚫", callback_data="Ban")
+        ]
+    ]
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
+    return keyboard
+
+
+def unban_button():
+    buttons = [
+        [
+            types.InlineKeyboardButton(text="❎ РОЗБАНИТИ ❎", callback_data="Unban")   
         ]
     ]
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
