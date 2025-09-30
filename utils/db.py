@@ -13,7 +13,6 @@ def execute_query(query, *params):
         return result
 
 def add_user(user_id, first_name, username, phone_number):
-    # Если запись уже существует, обновляем только номер телефона, если он пуст
     query = """
     INSERT INTO info (user_id, first_name, username, phone_number)
     VALUES (?, ?, ?, ?)
@@ -29,7 +28,7 @@ def add_user(user_id, first_name, username, phone_number):
 def is_user_in_db(user_id):
     query = "SELECT COUNT(1) FROM info WHERE user_id = ?"
     result = execute_query(query, user_id)
-    return result[0][0] > 0  # Возвращает True, если запись есть
+    return result[0][0] > 0
 
 def get_name(user_id):
     query = "SELECT name FROM info WHERE user_id = ?"
@@ -66,6 +65,7 @@ def is_user_active(user_id):
 # =====================================================================================
 # ===================================== Ban ===========================================
 # =====================================================================================
+
 def set_user_BANNED(user_id):
     query = "UPDATE info SET ifBanned = True WHERE user_id = ?"
     return execute_query(query, user_id)

@@ -3,3 +3,4 @@ config_reader.py
 database.db
 __pycache__/
 utils/__pycache__/
+bot.log
