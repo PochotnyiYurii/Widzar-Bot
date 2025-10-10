@@ -66,24 +66,23 @@ def is_user_active(user_id):
 # ===================================== Ban ===========================================
 # =====================================================================================
 
-def set_user_BANNED(user_id):
-    query = "UPDATE info SET ifBanned = True WHERE user_id = ?"
+def set_user_banned(user_id):
+    query = "UPDATE info SET ifbanned = True WHERE user_id = ?"
     return execute_query(query, user_id)
 
-def set_user_UNBANNED(user_id):
-    query = "UPDATE info SET ifBanned = False WHERE user_id = ?"
+def set_user_unbanned(user_id):
+    query = "UPDATE info SET ifbanned = False WHERE user_id = ?"
     return execute_query(query, user_id)
 
-def is_user_BANNED(user_id):
-    query = "SELECT ifBanned FROM info WHERE user_id = ?" 
+def is_user_banned(user_id):
+    query = "SELECT ifbanned FROM info WHERE user_id = ?" 
     return execute_query(query, user_id)
 
 def get_banned_users():
-    query = "SELECT user_id, username FROM info WHERE ifBanned = True"
+    query = "SELECT user_id, username FROM info WHERE ifbanned = True"
     return execute_query(query)
 
-def get_unbanned_user_ids():
-    """Получить user_id незабаненных пользователей"""
-    query = "SELECT user_id FROM info WHERE ifBanned = False"
+def get_unbanned_users():
+    query = "SELECT user_id FROM info WHERE ifbanned = False"
     result = execute_query(query)
     return [row[0] for row in result] if result else []

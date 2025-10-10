@@ -13,8 +13,8 @@ from datetime import datetime
 
 from config_reader import config
 
-from utils.keyboards import *
-from utils.db import *
+from utils.keyboards import contact_btn, get_button, get_button_admin, unban_button
+from utils.db import add_user, get_first_name, get_name, get_number, is_user_active, set_user_active, set_user_inactive, save_name, set_user_banned, set_user_unbanned, get_banned_users, get_unbanned_users
 from middlewares.logs import *
 from middlewares.banCheck import *
 from middlewares.registrationCheck import *
@@ -34,23 +34,28 @@ bot = Bot(token=config.bot_token.get_secret_value(),
 class Contact(StatesGroup):
     wait_for_contact = State()
 
-
-@dp.message(F.text, Command('start', 'register'))
-async def start(message: types.Message, state: FSMContext):
-    global username
-    username = message.from_user.username
+def check_time():
     current_time = datetime.now().time()
 
     if (current_time >= datetime.strptime('5:00', '%H:%M').time()) and (current_time < datetime.strptime('12:00', '%H:%M').time()):
-        greeting = f'Доброго ранку'
+        greeting = 'Доброго ранку'
     elif (current_time >= datetime.strptime('12:00', '%H:%M').time()) and (current_time < datetime.strptime('18:00', '%H:%M').time()):
-        greeting = f'Добридень'
+        greeting = 'Добридень'
     elif (current_time >= datetime.strptime('18:00', '%H:%M').time()) and (current_time <= datetime.strptime('23:59', '%H:%M').time()):
-        greeting = f'Добрий вечір'
+        greeting = 'Добрий вечір'
     elif (current_time >= datetime.strptime('00:00', '%H:%M').time()) and (current_time < datetime.strptime('05:00', '%H:%M').time()):
-        greeting = f'Доброї ночі'
+        greeting = 'Доброї ночі'
     else:
-        greeting = f'Привіт'
+        greeting = 'Привіт'
+        
+    return greeting
+
+@dp.message(F.text, Command('start', 'register'))
+async def start(message: Message, state: FSMContext):
+    global username
+    username = message.from_user.username
+    
+    greeting = check_time()
 
     msg=f'{greeting}! Для подальшої роботи з ботом вам треба зареєструватися.\nДля реєстрації натисніть кнопку "ПОДІЛИТИСЬ"'
 
@@ -58,7 +63,7 @@ async def start(message: types.Message, state: FSMContext):
     await state.set_state(Contact.wait_for_contact)
 
 @dp.message(Contact.wait_for_contact)
-async def contact(message: types.Message, state: FSMContext): 
+async def contact(message: Message, state: FSMContext): 
     if not message.contact:
         await message.answer("Будь ласка, надішліть свій контакт натиснув на кнопку «Поділитись».")
         return
@@ -85,7 +90,7 @@ async def contact(message: types.Message, state: FSMContext):
 
 
 @dp.message(F.text, Command("order"))
-async def order(message: types.Message):
+async def order(message: Message):
     user_id = message.from_user.id
 
     username = get_first_name(user_id)[0][0]
@@ -94,23 +99,10 @@ async def order(message: types.Message):
     activity = is_user_active(user_id)[0][0]
 
     if activity == 0:
-        if name:
-            username = name
-        else:
-            username = username
 
-        current_time = datetime.now().time()
+        username = name if name else username
 
-        if (current_time >= datetime.strptime('5:00', '%H:%M').time()) and (current_time < datetime.strptime('12:00', '%H:%M').time()):
-            greeting = f'Доброго ранку'
-        elif (current_time >= datetime.strptime('12:00', '%H:%M').time()) and (current_time < datetime.strptime('18:00', '%H:%M').time()):
-            greeting = f'Добридень'
-        elif (current_time >= datetime.strptime('18:00', '%H:%M').time()) and (current_time <= datetime.strptime('23:59', '%H:%M').time()):
-            greeting = f'Добрий вечір'
-        elif (current_time >= datetime.strptime('00:00', '%H:%M').time()) and (current_time < datetime.strptime('05:00', '%H:%M').time()):
-            greeting = f'Доброї ночі'
-        else:
-            greeting = f'Привіт'
+        greeting = check_time()
 
         global ask_ord
         ask_ord = f'{greeting}, <a href="tg://user?id={user_id}">{username}</a>! ☀️\nЧи бажаєте ви здійснити замовлення?'
@@ -120,11 +112,9 @@ async def order(message: types.Message):
     else:
         msg = "🛑Ви вже здійснюєте замовлення. Будь ласка, завершіть його, або використайте команду /stop, щоб скасувати поточне замовлення 🛑"
         await message.answer(msg)
-        return
-
 
 @dp.message(F.text, Command("stop"))
-async def stop(message: types.Message, state: FSMContext):
+async def stop(message: Message, state: FSMContext):
     user_id = message.from_user.id
     activity = is_user_active(user_id)[0][0]
 
@@ -147,7 +137,7 @@ class Waits(StatesGroup):
 
 
 @dp.callback_query(F.data == "YesBtn")
-async def YesBtn(call: types.CallbackQuery, state: FSMContext):
+async def yes_btn(call: CallbackQuery, state: FSMContext):
     global user_id
     user_id = call.from_user.id
     
@@ -161,7 +151,7 @@ async def YesBtn(call: types.CallbackQuery, state: FSMContext):
         check_name = get_name(user_id)[0][0]
 
         if check_name:
-            msg = f"Введіть ваше замовлення! ✉️"
+            msg = "Введіть ваше замовлення! ✉️"
 
             await state.set_state(Waits.wait_for_order)
             await call.message.answer(msg)
@@ -173,7 +163,7 @@ async def YesBtn(call: types.CallbackQuery, state: FSMContext):
 
 
 @dp.message(Waits.wait_for_name)
-async def name(message: types.Message, state: FSMContext): 
+async def name(message: Message, state: FSMContext): 
     name = message.text
     user_id = message.from_user.id
 
@@ -188,7 +178,7 @@ async def name(message: types.Message, state: FSMContext):
 
 
 @dp.message(Waits.wait_for_order)
-async def send_order(message: types.Message, state: FSMContext): 
+async def send_order(message: Message, state: FSMContext): 
     global admin_id 
     admin_id = 1071185904
     user_name = get_name(user_id)[0][0]
@@ -208,28 +198,14 @@ async def send_order(message: types.Message, state: FSMContext):
 
 
 @dp.callback_query(F.data == 'NoBtn')
-async def NoBtn(call: types.CallbackQuery, state: FSMContext):
+async def no_btn(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
     username = get_first_name(user_id)[0][0]
     name = get_name(user_id)[0][0]
 
-    if name:
-        username = name
-    else:
-        username = username
+    username = name if name else username
 
-    current_time = datetime.now().time()
-
-    if (current_time >= datetime.strptime('5:00', '%H:%M').time()) and (current_time < datetime.strptime('12:00', '%H:%M').time()):
-        greeting = f'Доброго ранку'
-    elif (current_time >= datetime.strptime('12:00', '%H:%M').time()) and (current_time < datetime.strptime('18:00', '%H:%M').time()):
-        greeting = f'Добридень'
-    elif (current_time >= datetime.strptime('18:00', '%H:%M').time()) and (current_time <= datetime.strptime('23:59', '%H:%M').time()):
-        greeting = f'Добрий вечір'
-    elif (current_time >= datetime.strptime('00:00', '%H:%M').time()) and (current_time < datetime.strptime('05:00', '%H:%M').time()):
-        greeting = f'Доброї ночі'
-    else:
-        greeting = f'Привіт'
+    greeting = check_time()
 
     msg = f'{greeting}, <a href="tg://user?id={user_id}">{username}</a>! ☀️\nЧи бажаєте ви здійснити замовлення?'
     set_user_inactive(user_id)
@@ -246,7 +222,7 @@ async def NoBtn(call: types.CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query(F.data == "Accept")
-async def accept(call: types.CallbackQuery):
+async def accept(call: CallbackQuery):
     set_user_inactive(user_id)
     approved = "\n\n ✅✅✅ Прийнято ✅✅✅"
     await call.message.edit_text(text=to_admin+approved, reply_markup=None)
@@ -255,7 +231,7 @@ async def accept(call: types.CallbackQuery):
 
 
 @dp.callback_query(F.data == "Decline")
-async def accept(call: types.CallbackQuery, state: FSMContext):
+async def accept(call: CallbackQuery, state: FSMContext):
     set_user_inactive(user_id)
     msg = "Вкажіть причину:"
     declined = "\n\n ❌❌❌ Відмовлено ❌❌❌"
@@ -265,7 +241,7 @@ async def accept(call: types.CallbackQuery, state: FSMContext):
 
 
 @dp.message(Waits.wait_for_reason)
-async def order(message: types.Message, state: FSMContext): 
+async def order(message: Message, state: FSMContext): 
     reason = message.text
     if reason.lower() == "без":
         msg = "❌❌❌ На жаль, вам було відмовлено. Гарного дня! ❌❌❌"
@@ -280,19 +256,19 @@ async def order(message: types.Message, state: FSMContext):
 # ===================================================================================================
 
 @dp.callback_query(F.from_user.id == 1071185904, F.data == "Ban")
-async def accept(call: types.CallbackQuery):
-    set_user_BANNED(user_id)
+async def accept(call: CallbackQuery):
+    set_user_banned(user_id)
     await call.message.edit_text(f"🚫 Користувач з user_id <code>{user_id}</code> був заблокований 🚫", reply_markup=unban_button())
 
 
 @dp.callback_query(F.from_user.id == 1071185904, F.data == "Unban")
-async def accept(call: types.CallbackQuery):
-    set_user_UNBANNED(user_id)
+async def accept(call: CallbackQuery):
+    set_user_unbanned(user_id)
     await call.message.edit_text(f"✅<a href='tg://user?id={user_id}'><b> Користувач 👤</b></a> був успішно разблокован! ✅ \nuser_id - <code>{user_id}</code>", reply_markup=None)
 
 
 @dp.message(F.from_user.id == 1071185904, Command("ban"))
-async def ban(message: types.Message, command: CommandObject):
+async def ban(message: Message, command: CommandObject):
     if command.args:
         user_id = command.args
         if not user_id.isdigit():
@@ -301,7 +277,7 @@ async def ban(message: types.Message, command: CommandObject):
             if (len(user_id) < 9 or len(user_id) > 10):
                 msg = "❌ Неправильна довжина user_id! Введіть коректний user_id ❌"
             else:
-                set_user_BANNED(user_id)
+                set_user_banned(user_id)
                 msg = f"<a href='tg://user?id={user_id}'><b> Користувач 👤</b></a> був успішно заблокован! ✅"
     else:   
         msg = "Не вказано значення після команди /ban"
@@ -309,7 +285,7 @@ async def ban(message: types.Message, command: CommandObject):
 
 
 @dp.message(F.from_user.id == 1071185904, Command("unban"))
-async def unban(message: types.Message, command: CommandObject):
+async def unban(message: Message, command: CommandObject):
     if command.args:
         user_id = command.args
         if not user_id.isdigit():
@@ -319,7 +295,7 @@ async def unban(message: types.Message, command: CommandObject):
                 msg = "❌ Неправильна довжина user_id! Введіть коректний user_id ❌"
             else:
                 user_id = int(user_id)
-                set_user_UNBANNED(user_id)
+                set_user_unbanned(user_id)
                 msg = f"<a href='tg://user?id={user_id}'><b>Користувач 👤</b></a> був разблокован! ✅"
         await message.answer(msg)
         return
@@ -329,9 +305,10 @@ async def unban(message: types.Message, command: CommandObject):
 
 @dp.message(F.from_user.id == 1071185904, F.text.lower() == "банлист")
 @dp.message(F.from_user.id == 1071185904,  Command("banlist"))
-async def banlist(message: types.Message):
-    user_id = message.from_user.id
+async def banlist(message: Message):
+
     banned_users = get_banned_users()
+    
     if banned_users:
         msg = "Список забанених користувачів:\n"
         for idx, user in enumerate(banned_users, start=1):
@@ -355,7 +332,7 @@ async def cmd_broadcast(message: Message, state: FSMContext):
 
 @dp.message(BroadcastState.waiting_for_content)
 async def process_broadcast_content(message: Message, state: FSMContext):
-    users = get_unbanned_user_ids()
+    users = get_unbanned_users()
     total = len(users)
     success = 0
     blocked = 0
@@ -366,13 +343,13 @@ async def process_broadcast_content(message: Message, state: FSMContext):
         try:
             await message.send_copy(chat_id=user_id)
             success += 1
-        except Exception as e:
+        except Exception:
             blocked += 1
         
         await asyncio.sleep(0.05)
 
     report = (
-        f"📊 Рассылка завершена!\n"
+        "📊 Рассылка завершена!\n"
         f"✅ Успешно: {success}\n"
         f"❌ Заблокировали бота: {blocked}\n"
         f"📩 Всего получателей: {total}"
@@ -382,9 +359,9 @@ async def process_broadcast_content(message: Message, state: FSMContext):
     await state.clear()
 
 
+
 class Update(StatesGroup):
     waiting_for_update_content = State()
-
 
 @dp.message(F.from_user.id == 1071185904, Command("upd"))
 async def cmd_update_broadcast(message: Message, state: FSMContext):
@@ -395,11 +372,11 @@ async def cmd_update_broadcast(message: Message, state: FSMContext):
 
 @dp.message(Update.waiting_for_update_content)
 async def process_update_content(message: Message, state: FSMContext):
-    users = get_unbanned_user_ids()
+    users = get_unbanned_users()
     total = len(users)
     success = 0
     blocked = 0
-    update_text = (f"🔔 *Новое обновление!* 🔔\n\n" f"{message.text}\n\n" f"🔥 Спасибо, что остаётесь с нами!")
+    update_text = (f"🔔 *Новое обновление!* 🔔\n\n {message.text}\n\n🔥 Спасибо, что остаётесь с нами!")
 
     await message.answer(f"🚀 Начата рассылка для {total} пользователей...")
 
@@ -407,12 +384,12 @@ async def process_update_content(message: Message, state: FSMContext):
         try:
             await message.bot.send_message(chat_id=user_id, text=update_text, parse_mode="Markdown")
             success += 1
-        except Exception as e:
+        except Exception:
             blocked += 1
         await asyncio.sleep(0.05)
 
     report = (
-        f"📊 Рассылка завершена!\n"
+        "📊 Рассылка завершена!\n"
         f"✅ Успешно: {success}\n"
         f"❌ Заблокировали бота: {blocked}\n"
         f"📩 Всего получателей: {total}"
