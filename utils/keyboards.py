@@ -21,7 +21,6 @@ def get_button():
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard
 
-
 def get_button_admin():
     buttons = [
         [

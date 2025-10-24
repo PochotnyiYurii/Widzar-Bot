@@ -3,7 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandObject
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.context import FSMContext
@@ -15,9 +15,9 @@ from config_reader import config
 
 from utils.keyboards import contact_btn, get_button, get_button_admin, unban_button
 from utils.db import add_user, get_first_name, get_name, get_number, is_user_active, set_user_active, set_user_inactive, save_name, set_user_banned, set_user_unbanned, get_banned_users, get_unbanned_users
-from middlewares.logs import *
-from middlewares.banCheck import *
-from middlewares.registrationCheck import *
+from middlewares.logs import LoggerMiddleware
+from middlewares.banCheck import BanCheckMiddleware
+from middlewares.registrationCheck import RegistrationCheckMiddleware
 
 logging.basicConfig(level=logging.INFO)
 
@@ -52,9 +52,9 @@ def check_time():
 
 @dp.message(F.text, Command('start', 'register'))
 async def start(message: Message, state: FSMContext):
-    global username
     username = message.from_user.username
-    
+    await state.update_data(username=username)
+
     greeting = check_time()
 
     msg=f'{greeting}! Для подальшої роботи з ботом вам треба зареєструватися.\nДля реєстрації натисніть кнопку "ПОДІЛИТИСЬ"'
@@ -64,6 +64,9 @@ async def start(message: Message, state: FSMContext):
 
 @dp.message(Contact.wait_for_contact)
 async def contact(message: Message, state: FSMContext): 
+    data = await state.get_data()
+    username = data.get("username")
+
     if not message.contact:
         await message.answer("Будь ласка, надішліть свій контакт натиснув на кнопку «Поділитись».")
         return
@@ -90,7 +93,7 @@ async def contact(message: Message, state: FSMContext):
 
 
 @dp.message(F.text, Command("order"))
-async def order(message: Message):
+async def main_order(message: Message, state: FSMContext):
     user_id = message.from_user.id
 
     username = get_first_name(user_id)[0][0]
@@ -104,8 +107,8 @@ async def order(message: Message):
 
         greeting = check_time()
 
-        global ask_ord
         ask_ord = f'{greeting}, <a href="tg://user?id={user_id}">{username}</a>! ☀️\nЧи бажаєте ви здійснити замовлення?'
+        await state.update_data(ask_ord=ask_ord)
 
         await message.answer(ask_ord, reply_markup=get_button())
 
@@ -138,9 +141,12 @@ class Waits(StatesGroup):
 
 @dp.callback_query(F.data == "YesBtn")
 async def yes_btn(call: CallbackQuery, state: FSMContext):
-    global user_id
     user_id = call.from_user.id
+    await state.update_data(user_id=user_id)
     
+    data = await state.get_data()
+    ask_ord = data.get("ask_ord")
+
     activity = is_user_active(user_id)[0][0]
 
     if activity == 0:
@@ -167,7 +173,7 @@ async def name(message: Message, state: FSMContext):
     name = message.text
     user_id = message.from_user.id
 
-    if name == '/stop':
+    if message.text == '/stop':
         await stop(message)
         return
     else:
@@ -179,18 +185,24 @@ async def name(message: Message, state: FSMContext):
 
 @dp.message(Waits.wait_for_order)
 async def send_order(message: Message, state: FSMContext): 
-    global admin_id 
     admin_id = 1071185904
-    user_name = get_name(user_id)[0][0]
+    await state.update_data(admin_id=admin_id)
+    
+    data = await state.get_data()
+    user_id = data.get("user_id")
+    
+    username = get_name(user_id)[0][0]
     phone_number = get_number(user_id)[0][0]
-    if name == '/stop':
+    if message.text == '/stop':
         await stop(message)
         return
     else:
         order = message.text
         msg = "Ваше замовлення було надіслано. Зараз воно проходить перевірку. Очікуйте, будь ласка! ✅"
+        
         global to_admin
-        to_admin = f"❗️Нове замовлення!❗️\n\n👤 Ім'я: <a href='tg://user?id={user_id}'>{user_name}</a> 👤\n🔒 ID: <code>{user_id}</code> 🔒\n📱 Номер телефону: {phone_number} 📱\n\n✉️ Замовлення: {order} ✉️"
+        to_admin = f"❗️Нове замовлення!❗️\n\n👤 Ім'я: <a href='tg://user?id={user_id}'>{username}</a> 👤\n🔒 ID: <code>{user_id}</code> 🔒\n📱 Номер телефону: {phone_number} 📱\n\n✉️ Замовлення: {order} ✉️"
+
         set_user_inactive(user_id)
         await bot.send_message(user_id, msg)
         await bot.send_message(admin_id, to_admin, reply_markup=get_button_admin())
@@ -198,7 +210,7 @@ async def send_order(message: Message, state: FSMContext):
 
 
 @dp.callback_query(F.data == 'NoBtn')
-async def no_btn(call: CallbackQuery, state: FSMContext):
+async def no_btn(call: CallbackQuery):
     user_id = call.from_user.id
     username = get_first_name(user_id)[0][0]
     name = get_name(user_id)[0][0]
@@ -222,7 +234,10 @@ async def no_btn(call: CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query(F.data == "Accept")
-async def accept(call: CallbackQuery):
+async def accept(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    user_id = data.get("user_id")
+
     set_user_inactive(user_id)
     approved = "\n\n ✅✅✅ Прийнято ✅✅✅"
     await call.message.edit_text(text=to_admin+approved, reply_markup=None)
@@ -231,7 +246,11 @@ async def accept(call: CallbackQuery):
 
 
 @dp.callback_query(F.data == "Decline")
-async def accept(call: CallbackQuery, state: FSMContext):
+async def decline(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    user_id = data.get("user_id")
+    admin_id = data.get("admin_id")
+
     set_user_inactive(user_id)
     msg = "Вкажіть причину:"
     declined = "\n\n ❌❌❌ Відмовлено ❌❌❌"
@@ -242,6 +261,9 @@ async def accept(call: CallbackQuery, state: FSMContext):
 
 @dp.message(Waits.wait_for_reason)
 async def order(message: Message, state: FSMContext): 
+    data = await state.get_data()
+    user_id = data.get("user_id")
+    
     reason = message.text
     if reason.lower() == "без":
         msg = "❌❌❌ На жаль, вам було відмовлено. Гарного дня! ❌❌❌"
@@ -256,13 +278,19 @@ async def order(message: Message, state: FSMContext):
 # ===================================================================================================
 
 @dp.callback_query(F.from_user.id == 1071185904, F.data == "Ban")
-async def accept(call: CallbackQuery):
+async def ban_btn(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    user_id = data.get("user_id")
+
     set_user_banned(user_id)
     await call.message.edit_text(f"🚫 Користувач з user_id <code>{user_id}</code> був заблокований 🚫", reply_markup=unban_button())
 
 
 @dp.callback_query(F.from_user.id == 1071185904, F.data == "Unban")
-async def accept(call: CallbackQuery):
+async def unban_btn(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    user_id = data.get("user_id")
+
     set_user_unbanned(user_id)
     await call.message.edit_text(f"✅<a href='tg://user?id={user_id}'><b> Користувач 👤</b></a> був успішно разблокован! ✅ \nuser_id - <code>{user_id}</code>", reply_markup=None)
 

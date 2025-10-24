@@ -1,7 +1,7 @@
 from aiogram import BaseMiddleware
 from aiogram.types import Update, Message, CallbackQuery
 from typing import Callable, Dict, Any, Awaitable
-from utils.db import is_user_BANNED
+from utils.db import is_user_banned
 
 
 class BanCheckMiddleware(BaseMiddleware):
@@ -24,7 +24,7 @@ class BanCheckMiddleware(BaseMiddleware):
 
             if user:
                 user_id = user.id
-                banned = is_user_BANNED(user_id)
+                banned = is_user_banned(user_id)
                 if banned and banned[0][0]:
                     return
 
