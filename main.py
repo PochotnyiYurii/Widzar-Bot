@@ -200,13 +200,19 @@ async def send_order(message: Message, state: FSMContext):
         order = message.text
         msg = "Ваше замовлення було надіслано. Зараз воно проходить перевірку. Очікуйте, будь ласка! ✅"
         
-        global to_admin
-        to_admin = f"❗️Нове замовлення!❗️\n\n👤 Ім'я: <a href='tg://user?id={user_id}'>{username}</a> 👤\n🔒 ID: <code>{user_id}</code> 🔒\n📱 Номер телефону: {phone_number} 📱\n\n✉️ Замовлення: {order} ✉️"
+        to_admin = (
+            f"❗️Нове замовлення!❗️\n\n"
+            f"👤 Ім'я: <a href='tg://user?id={user_id}'>{username}</a> 👤\n"
+            f"🔒 ID: <code>{user_id}</code> 🔒\n"
+            f"📱 Номер телефону: {phone_number} 📱\n\n"
+            f"✉️ Замовлення: {order} ✉️"
+        )
 
+        await state.update_data(to_admin=to_admin)
+        
         set_user_inactive(user_id)
         await bot.send_message(user_id, msg)
         await bot.send_message(admin_id, to_admin, reply_markup=get_button_admin())
-        await state.clear()
 
 
 @dp.callback_query(F.data == 'NoBtn')
@@ -238,11 +244,14 @@ async def accept(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     user_id = data.get("user_id")
 
+    to_admin = data.get("to_admin")
+
     set_user_inactive(user_id)
     approved = "\n\n ✅✅✅ Прийнято ✅✅✅"
     await call.message.edit_text(text=to_admin+approved, reply_markup=None)
     msg = "✅ Ваше замовлення було прийнято. Очікувайти поки з вами зв'яжуться. Я завжди тут, якщо ви забажаєте здійснити нове замовлення! ✅"
     await call.bot.send_message(user_id, msg)
+    await state.clear()
 
 
 @dp.callback_query(F.data == "Decline")
@@ -251,13 +260,15 @@ async def decline(call: CallbackQuery, state: FSMContext):
     user_id = data.get("user_id")
     admin_id = data.get("admin_id")
 
+    to_admin = data.get("to_admin")
+
     set_user_inactive(user_id)
     msg = "Вкажіть причину:"
     declined = "\n\n ❌❌❌ Відмовлено ❌❌❌"
     await call.message.edit_text(text=to_admin+declined, reply_markup=None)
     await bot.send_message(admin_id, msg)
     await state.set_state(Waits.wait_for_reason)
-
+    await state.clear()
 
 @dp.message(Waits.wait_for_reason)
 async def order(message: Message, state: FSMContext): 
